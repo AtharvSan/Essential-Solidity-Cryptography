@@ -1,38 +1,74 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-/* what computation to be placed onchain and what to be done offchain @todo */
-
-/* cryptography native properties @todo */
-// - uniqueness
-// - data identifier
-// - deterministic
-// - speed
-// - anonymity
-// - random output (no guessing)
-// - non reversibility
-// - snowball effect
-// - locking
-// - unlocking
-// - keys and locks
-// - proof of order (signatures)
-// - verification of signatures
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@chainlink/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
+import "@chainlink/v0.8/vrf/VRFConsumerBaseV2.sol";
 
 
-/* */ 
-contract cryptography_cheatsheet {
-    // State vars ////////////////////////////////////////////////////
-    /* 5 ------- */
-    address multisig = address(new MultiSig());
+/* computation environments ------------------------*/
+// - onchain
+//      - immutable
+//      - transparent
+// - offchain
+//      - heavy computations
+//      - privacy
+// notes: use cryptographic proofs to bridge off-chain to on-chain
 
-    /* 6 ------- */
-    address alice = address(0x2);
-    address bob = address(0x3);
+/* cryptography native properties -----------------*/
+// - data 
+//      - easy reference to data: hash is an easy reference to data thats easy to deal with than the actual data
+//      - randomness: no predictability in output
+//      - Collision Resistance(uniqueness) – No two different inputs should produce the same output
+//      - Preimage Resistance(non reversibility) – Given a output, it should be infeasible to find the original input.
+//      - Avalanche Effect – A small change in input should result in a completely different output
+//      - deterministic - same output for same input
+//      - Integrity(tamper proof): Guarantees that data has not been altered or tampered with.
+//      - Semantic Security – Ciphertext leaks no partial information about plaintext.
+//      - encryption: locking
+//      - decryption: unlocking
+//      - Zero-Knowledge Proofs – Prove knowledge of a secret without revealing it.
+// - participants
+//      - trust: you will have to know the character before you can interact with them
+//      - trustless: you can interact with anyone without knowing them
+//      - Confidentiality: only authorized parties can access the information.
+//      - Authentication: Verifies the identity of communicating parties.
+//      - non-repudiation: proof of action
+//      - anonymity: no one knows who is interacting with the data
+//      - signatures(proof of order)
+// - verifiability: proof of correctness
 
+// cryptographic terms and definitions @todo
+// - hash
+// - seed
+// - salt
+// - encryption
+// - plain text
+// - cypher text
+// - pvt public keys
+// - signature
+// - signed order
+// - signed data
 
+/// @author AtharvSan
+/// @dev Short notes and compilable cheatsheet of essential cryptography for solidity devs (educational purposes only)
+contract cryptography_cheatsheet is VRFConsumerBaseV2 {
+    constructor(
+        bytes32 _merkleRoot,
+        address _vrfCoordinator,
+        uint64 _subscriptionId,
+        bytes32 _keyHash
+    ) VRFConsumerBaseV2(_vrfCoordinator) {
+        // 11. merkelRoot
+        merkleRoot = _merkleRoot;
 
+        // 12. randomness generation (chainlink vrf)
+        owner_vrf = msg.sender;
+        COORDINATOR = VRFCoordinatorV2Interface(_vrfCoordinator);
+        subscriptionId = _subscriptionId;
+        keyHash = _keyHash;
+    }
 
-    // Notes and Functions ///////////////////////////////////////////
     /* 1. Hash functions --------------------------------------------*/
     // - the problem : data is sometimes too big its hard to point out the exact data(if the data be corrupted)
     // - the solution : the data is shortened down to few bytes, now its way easier to give reference to exact data
@@ -44,7 +80,7 @@ contract cryptography_cheatsheet {
     //      - avalanche effect : small change in input will result in completely different output
     //      - pre-image resistance : given output, very hard to find input that gives that output
     //      - fixed output size : always gives same size output
-    bytes32 internal ATHARVSAN = keccak256("atharvsan"); 
+    bytes32 constant public ATHARVSAN = keccak256("atharvsan"); 
 
 
     /* 2. Encryption ------------------------------------------------*/
@@ -53,39 +89,39 @@ contract cryptography_cheatsheet {
     // - implementation : OFFCHAIN encryption by wallets
 
 
-    /* 3. Elliptic Curves -------------------------------------------*/
+    /* 3. Elliptic Curves and keys ----------------------------------*/
     // - the problem : strangers not able to open the encrypted lock
     // - the solution : seperation of keys for locking and opening. Anyone can lock but only the reciever can open.
-    // - pvt key :
-    //      - randomly generated 256-bit key using random number generator from the OS
-    //      - opens the encrypted lock
-    //      - creates a signature
-    // - pub key :
-    //      - generated by doing elliptic curve multiplication on the pvt key
-    //      - closes the encryption lock
     // - implementation : OFFCHAIN key computation using the secp256k1 curve
+    // - properties : 
+    //      - pvt key: 
+    //          - opens the encrypted lock
+    //          - creates a signature
+    //      - public key:
+    //          - closes the encryption lock
+    // - trivia :
+    //      - each account has its own lock, use the account's public key to use it.
+    //      - pvt key :
+    //          - randomly generated 256-bit key using random number generator from the OS
+    //      - pub key :
+    //          - generated by doing elliptic curve multiplication on the pvt key
 
 
     /* 4. Signatures ------------------------------------------------*/
-    // - trivia : 
-    //      - signatures are created offchain, so this is a gasless process.
     // - the problem : secure communication with strangers became possible, but no info on who sent the message
     // - the solution : sender sends his signature along with the data
-    // - signature(bytes32 r, bytes32 s, uint8 v) is a 65-byte data created by ECDSA using data and pvt key
-    // - how it is done : 
-    //      - signatures are created OFFCHAIN using ECDSA(ethersjs), but verification can be done onchain with ecrecover
-    //      - standard transactions : <RLPdata,r,s,v> generated by wallets
-    //      - presigned transactions : <signed_data,r,s,v> 
-    //          - create signed_data according to eip191
-    //          - ECDSA(signed_data,pvt_key) --> v,r,s
+    // - implementation : 
+    //      - signatures are created OFFCHAIN using ECDSA, but verification can be done onchain with ecrecover
+    //          - signatures generated by wallets: standard transactions <RLPdata,r,s,v>
+    //          - generated by offchain scripts: signed orders <signed_data,r,s,v>
+    //              - create signed_data according to eip191
+    //              - ECDSA(signed_data,pvt_key) --> v,r,s
+    // - trivia :
+    //      - signatures are created offchain, so this is a gasless process.
+    //      - signature(bytes32 r, bytes32 s, uint8 v) is a 65-byte data created by ECDSA using data and pvt key
 
 
     /* 5. EIP191 signed_data standard --------------------------------*/
-    // - essential trivia :
-    //      - signed_data : the data on which the signature is created
-    //      - presigned txns : a chunk of binary 'signed_data', along with the signature(r,s,v)
-    //      - txn : RLP<nonce, gasPrice, startGas, to, valve, data>, r, s, v
-    //      - helps in verification of off-chain signatures in ethereum ecosystem
     // - the problem: 
     //      - presigned txn getting confused with standard txns as there was no standard to differentiate in 'signed_data' and 'RLPdata'
     //      - the signed_data was not standardized, caused confusion in verification
@@ -94,11 +130,18 @@ contract cryptography_cheatsheet {
     //      - creating a standard scheme for 'signed_data', to avoid confusion while verifying
     // - implementation :
     //      - signed_data = hash(encodePacked( 0x19 | version | version_data | data_to_sign ))
-    //
+    //          **********************************************************************
     //          0x19 | 0x00   | intended validator | data to sign
     //          0x19 | 0x01   | domainSeperator    | hashStruct(message)
     //          0x19 | 0x45(E)| thereum Signed Message:\n"+len(message) | data to sign
+    //          **********************************************************************
+    // - trivia :
+    //      - signed_data : the data on which the signature is created
+    //      - signed order : a chunk of binary 'signed_data', along with the signature(r,s,v)
+    //      - standard txn : RLP<nonce, gasPrice, startGas, to, valve, data>, r, s, v
+    //      - helps in verification of off-chain signatures in ethereum ecosystem
     //
+    address multisig = address(new MultiSig());
     function Signed_data00() view public returns(bytes32 signed_data00){
         bytes memory data00 = "yo..";
         // signed_data00 = 0x19 || 0x00 || validator address || data00
@@ -112,7 +155,7 @@ contract cryptography_cheatsheet {
     }
 
 
-    /* 6. EIP712 structured data hashing and signing -----------------*/
+    /* 6. EIP712 structured data hashing and signing -------------------*/
     // - the problem : complex data structures are hard to sign and verify
     // - the solution : 
     //      - create a standard for hashing and signing structured data
@@ -120,13 +163,19 @@ contract cryptography_cheatsheet {
     // - implementation :
     //      - create a struct of EIP712Domain and data
     //      - create a hashStruct of EIP712Domain and data
-    //          - typehash
-    //          - encodeData: hashvalues of dynamic types like strings and bytes, direct values for fixed types
-    //      - create signed_data01 
+    //          - typehash: notice that no space after the comma
+    //          - encodeData: each encoded member value is exactly 32-byte long, thats why abi.encode is used at encodeData step
+    //              - atomic values are encoded directly
+    //              - The array values are encoded as the keccak256 hash of the concatenated encodeData of their contents 
+    //                (i.e. the encoding of SomeType[5] is identical to that of a struct containing five members of type SomeType).
+    //              - hash values for dynamic types
+    //      - create signed_data01
     //      - sign the hash
     // - properties
     //      - domainSeperator should be unique to the contract and chain to prevent replay attacks from other domains, and satisfy 
     //        the requirements of EIP-712, but is otherwise unconstrained.
+    // - use cases :
+    //      - @todo
     struct EIP712Domain {
         string name;
         string version;
@@ -134,15 +183,18 @@ contract cryptography_cheatsheet {
         address verifyingContract;
         bytes32 salt;
     }
-    struct Mail { //@todo include all of the datatypes for showcasing encoding scheme
+    struct Mail { 
         string subject;
         address to;
         address from;
         uint256 nonce;
+        bytes4 magicValue;
+        bytes data;
+        bool result;
+        string[3] message;
     }
     function Signed_data01() view public returns(bytes32 signed_data01) {
-        // signed_data01 = 0x19 || 0x01 || domainSeperator || hashStruct
-        bytes32 typeHash_eip712domain = keccak256("EIP712Domain(string name, string version uint256 chainId, address verifyingContract, bytes32 salt)");
+        bytes32 typeHash_eip712domain = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)");
         bytes32 hashStruct_EIP712Domain = keccak256(abi.encode(
             typeHash_eip712domain, 
             keccak256("name"),
@@ -153,26 +205,41 @@ contract cryptography_cheatsheet {
             )
         );
 
-        bytes32 typeHash_mail = keccak256("Mail(string subject, address to, address from, uint256 nonce)");
+        address alice = address(0x2);
+        address bob = address(0x3);
+        bytes32 typeHash_mail = keccak256("Mail(string subject,address to,address from,uint256 nonce,bytes4 magicValue,bytes data,bool result,string[3] message)");
         bytes32 hashStruct_mail = keccak256(abi.encode(
             typeHash_mail,
             keccak256("practice"),
             alice,
             bob,
-            0
+            0,
+            0x12345678,
+            keccak256("data"),
+            true,
+            keccak256(abi.encodePacked(
+                keccak256("hey"),
+                keccak256("hello"),
+                keccak256("hi")
+            ))
         ));
+        // signed_data01 = 0x19 || 0x01 || domainSeperator || hashStruct
         signed_data01 = keccak256(abi.encodePacked(hex"1901", hashStruct_EIP712Domain, hashStruct_mail));
     }
 
 
-    /* 7. Signature verification @todo */
-    // - the problem : signatures creation and verification both are handled at infrasturcture level, but if signatures are handled 
-    //   outside the infrastructure, you need to do handle both signature creation and signature verification independently
+    /* 7. Signature verification ----------------------------------*/
+    // - the problem : signatures are handled at infrasturcture level, but if you choose to do it yourself you will need to do handle
+    //   both signature creation(offchain) and signature verification(onchain) independently
     // - the solution : create offchain signatures using ECDSA, and include a function in smart contracts that verifies the signature 
     //   using version 00 of eip191
     // - implementation : 
-    // - properties : 
-    // - use cases :
+    //      - arrange: recreate the signed_data version 00 thats intended for verification
+    //      - extraction: ecrecover(signed_data, v, r, s)
+    //      - verification: recovered address == owner that was included in signed_data
+    // - use cases:
+    //      - no need to transact yourself, create signed orders that can be submitted via 3rd party(relayers) as the process is not 
+    //        depending on msg.sender for proof of origin.
     function verify(address owner, bytes calldata data, uint8 v, bytes32 r, bytes32 s) public view returns (bool success) {
         bytes32 signed_data = keccak256(abi.encodePacked(hex"1900", address(this), data));
         address signer = ecrecover(signed_data, v, r, s);
@@ -181,11 +248,7 @@ contract cryptography_cheatsheet {
     }
 
 
-    /* 8. EIP2612 signed approvals for erc20 tokens ------------------*/
-    // - trivia
-    //      - a practical application of independent signature handling (offchain signature creation and onchain signature verification)
-    //      - it de-couples ERC20 from msg.sender(builtin signature handling) by handling signatures independently
-    //      - A common use case of permit design pattern has a relayer submit a permit order on behalf of the owner.
+    /* 8. EIP2612 signed approvals for erc20 tokens ---------------------------*/
     // - the problem : ERC20 operation is attached to msg.sender for its builtin signature handling
     // - the solution : decouple ERC20 from msg.sender by implementing signature handling independently 
     //      - offchain signature creation (v, r, s): ECDSA(signed_data, pvtKey)
@@ -202,24 +265,28 @@ contract cryptography_cheatsheet {
     //        }
     //      - function nonces(address owner) external view returns (uint)
     //      - function DOMAIN_SEPARATOR() external view returns (bytes32)
-    // - pros :
+    // - use cases :
     //      - Gasless approves
     //          - Users can approve token transfers without paying gas fees upfront.
     //          - instead of calling approve(), users sign a message off-chain, which is later submitted by the relayer.
     //      - Uniswap and Aave use EIP-2612 to streamline token approvals
     //          - No need for two transactions (approve() + transferFrom()), improving user experience.
     //          - Ideal for onboarding new users without requiring ETH for gas.
-    //      - Security notes
-    //          - reducing frontrunning risks
-    //          - Uses eip712 domainSeperator, preventing signature malleability issues.
-    //          - deadline param prevents issues like "stuck approvals" 
-    //          - nonces gives replay protection
-    //          - Since the ecrecover precompile fails silently and just returns the zero address as signer when given malformed messages, 
-    //            it is important to ensure owner != address(0) to avoid permit from creating an approval to spend “zombie funds” belong 
-    //            to the zero address.
-    //          - The standard EIP-20 race condition for approvals (SWC-114) applies to permit as well
-    //          - If the DOMAIN_SEPARATOR contains the chainId and is defined at contract deployment instead of reconstructed for every signature, 
-    //            there is a risk of possible replay attacks between chains in the event of a future chain split.
+    // - Security notes
+    //      - reducing frontrunning risks
+    //      - Uses eip712 domainSeperator, preventing signature malleability issues.
+    //      - deadline param prevents issues like "stuck approvals" 
+    //      - nonces gives replay protection
+    //      - Since the ecrecover precompile fails silently and just returns the zero address as signer when given malformed messages, 
+    //        it is important to ensure owner != address(0) to avoid permit from creating an approval to spend “zombie funds” belong 
+    //        to the zero address.
+    //      - The standard EIP-20 race condition for approvals (SWC-114) applies to permit as well
+    //      - If the DOMAIN_SEPARATOR contains the chainId and is defined at contract deployment instead of reconstructed for every signature, 
+    //        there is a risk of possible replay attacks between chains in the event of a future chain split.
+    // - trivia
+    //      - a practical application of independent signature handling (offchain signature creation and onchain signature verification)
+    //      - it de-couples ERC20 from msg.sender(builtin signature handling) by handling signatures independently
+    //      - A common use case of permit design pattern has a relayer submit a permit order on behalf of the owner.
     mapping(address => mapping(address => uint256)) public allowance;
     mapping(address => uint256) public nonces;
     event Approval(address indexed owner, address indexed spender, uint256 amount);
@@ -287,53 +354,238 @@ contract cryptography_cheatsheet {
             );
     }
 
-    // 9. EIP1271 contract signature verification
-    // - the problem : Externally Owned Accounts (EOA) can sign messages with their associated private keys, but contracts cannot.
-    // - the solution : 
-    // - implementation : 
-    //      - function isValidSignature() inside signer contract : verifies that the signer is the owner of the signing contract.
-    //      - MUST return the bytes4 magic value 0x1626ba7e when function passes.
-    //      - MUST NOT modify state
-    // - use cases : 
-    // - security : 
-    //      - signature malleability
-    /* implementation of a contract calling isValidSignature() on external signing contract -----------------------*/
-    function callERC1271isValidSignature(address _addr, bytes32 _hash, bytes calldata _signature) external view {
+
+    /* 9. EIP1271: ecrecover for multi-account signatures */
+    // - the problem : no native support to handle(generate and verify) multi account signatures
+    // - the solution :
+    //      - create signatures(anywhere onchain offchain) without ECDSA (cuz contracts dont have pvt keys) using EOA signatures as base components 
+    //        (Notice that signatures can be anything as long as it gives proof of origin)
+    //      - now you need to write the logic for how to veify the signature that your contract has just created(cuz ecrecover is for single
+    //        account signatures)
+    // - implementation :
+    //      - signature creation
+    //          - a custom sign function: uses EOA owner signatures to generate something that represents joint multi account signature.
+    //      - signature verification
+    //          - a custom isValidSignature function: 
+    //              - uses the same logic from sign function to verify if the given signature was really from your contract.
+    //              - must return the bytes4 magic value 0x1626ba7e when function passes.
+    //              - must not modify state
+    //      - in standard single account signature verification, the receiving contract of (signed order, signature) uses builtin 
+    //        recovery logic(ecrecover). But in our case the receiving contract of (signed order, signature) uses custom logic(isValidSignature)
+    // - use cases :
+    //      - multiSig wallets
+    //      - advanced signed orders
+    // - trivia :
+    //      - ethereum's native signatures originate from single point of source(pvt key of user account), but if you need joint partnership
+    //        accounts you will need to create signatures that represent multiple accounts involved in the parthnership.
+    //      - signature is basically a proof of origin, it doesnt necessarily be just the (v, r, s), it can be anything as long as
+    //        the proof of origin(the signature) is verifyable. The verification logic can be anything, as long as it can correctly identify 
+    //        the origin from the signature
+    //      - standardizes verification, not creation.
+    function callERC1271isValidSignature(address _addr, bytes32 _hash, bytes calldata _signature) external view { //@todo
         bytes4 result = IERC1271Wallet(_addr).isValidSignature(_hash, _signature);
         require(result == 0x1626ba7e, "INVALID_SIGNATURE");
     }
     
 
-    // 10. commit reveal scheme @todo
-    // - the problem : The commit-reveal scheme is essential in blockchain-based applications as it ensures that 
-    //   users cannot change their answers once they have submitted them, and prevents others from knowing the answer before the deadline.
+    // 10. commit reveal mechanism
+    // - the problem :
+    //      - in coordinated efforts like voting or auctions, notorious users can change submissions as and when they feel.
+    //      - mempool is transparent and plain text data in txns is easy to intercept, bots can read the txns and frontrun as they suit. 
     // - the solution : 
-    //      - commit
-    //      - reveal 
+    //      - commit reveal mechanism, commit the hash of secret onchain and reveal the secret at the right time.
     // - implementation : 
-    // - properties : 
-    // - use cases : every type of blockchain interaction that requires a wallet signature.
-    //      - intent-based trading
-    //      - advanced order types
-
-    // 11. merkle trees @todo
-    // - the problem : 
-    // - the solution : 
-    // - implementation : 
-    // - properties : 
+    //      - commit: save the hash of your secret onchain
+    //      - reveal: reveal your secret at the appropriate time, so that anyone can cross verify with the hash.
     // - use cases :
+    //      - fairness in participation (voting, auctions, games)
+    struct Commitment { //@todo
+        bytes32 commitHash;
+        bool revealed;
+    }
+    mapping(address => Commitment) public commitments;
 
-    // 12. randomness generation (chainlink) @todo
+    /// @notice commitHash == keccak256(abi.encodePacked(_secret, _salt))
+    function commit(bytes32 _commitHash) external {
+        require(commitments[msg.sender].commitHash == bytes32(0), "Already committed");
+        commitments[msg.sender] = Commitment(_commitHash, false);
+    }
+
+    /// @notice Reveal the secret value and salt
+    function reveal(string memory _secret, uint256 _salt) external {
+        // 1. sanitation
+        Commitment storage userCommitment = commitments[msg.sender];
+        require(userCommitment.commitHash != bytes32(0), "No commitment found");
+        require(!userCommitment.revealed, "Already revealed");
+
+        // 2. Verify the hash
+        require(userCommitment.commitHash == keccak256(abi.encodePacked(_secret, _salt)), "Invalid reveal");
+        userCommitment.revealed = true;
+
+        // 3. Process revealed value (e.g., store or use it)
+    }
+
+
+    /* 11. merkleRoot: an advanced hash, now you can interact with it ------------------------*/
+    // - objective :
+    //     - verify membership of an element in a set
     // - the problem : 
+    //      - you can't store big list of users onchain, thats expensive. Hashes are small bytes32 values, but you can not interact with them.
+    //      - if you store some small value like hash, how do you prove membership of an element that made up the hash. 
     // - the solution : 
-    // - implementation : 
+    //      - you use merkle root that are small cuz its a hash at the end, but its special that you can interact with it.
+    // - implementation :
+    //      - 1. create a merkelRoot offchain (in ethers.js or Python) out of the set of elements and store it onchain
+    //      - 2. to verify membership, you will need the merkleProof and the leaf ready for that particular element. You need to generate 
+    //        the merkleProof offchain (in ethers.js or Python) before sending it to Solidity.
+    //      - 3. just call the verifyMember function with the leaf and merkleProof, it verifies the proof and tells if the element was included in
+    //        the calculation of the root hash.
     // - properties : 
-    // - use cases :
+    //      - small size of merkle root
+    //      - interactable: you can verify if an element was included in calculation of the root hash
+    //      - minimal computation: 
+    //          - building the merkleTree : O(N)
+    //          - everything else: O(logN)
+    // - use cases : 
+    //      - save gas on verifing a user's membership
+    //      - Prove a file’s integrity without storing it fully on-chain
+    // - trivia :
+    //      - merkleRoot: the final single hash at the top of the tree.
+    //          - Leaf nodes contain the hashes of individual data elements.
+    //          - Each parent node is the hash of its two child nodes.
+    //          - The merkle root is the final single hash at the top of the tree.
+    //      - merkleProof: all the brothers in the pairs upto root to prove the membership of an element
+    //          - A path of hashes in the tree needed to recompute the Merkle root.
+    //      - leaf: hash of an element in the set
+    bytes32 public merkleRoot;
+    function verifyMember(bytes32[] memory merkleProof) view public {
+        // prepare the leaf for the element
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        
+        // recreating merkleRoot using leaf and Proof, to match if its indeed the root. That tells if leaf was included in calculation of merkelRoot.
+        require(MerkleProof.verify(merkleProof, merkleRoot, leaf),"invalid proof");
+    }
 
+
+    // 12. Randomness generation : Chainlink VRF
+    // - the problem : 
+    //      - Computers are deterministic (outputs are generated via a fixed process). So there remains a chance of predicting outputs, if the 
+    //        computation process is known. The issue is how do you get randomness in deterministic environments.
+    // - the solution :
+    //      - generate randomness outside of the system and just import it
+    // - implementation of chainlink vrf :
+    //      - integrate chinklink vrf into your randomness consumer contract
+    //      - to import randomness consumer contract calls chainlink coordinator
+    // - properties :
+    //      - generates randomness outside of your system
+    //      - Verifiable: Proof is validated on-chain to ensure no manipulation. but how ? @todo 
+    //      - Decentralized: Combines oracle secrets, user input, and blockchain state.
+    // - use cases : 
+    //      - fairness in distribution (lottery, in-game mechanisms)
+    VRFCoordinatorV2Interface COORDINATOR; //@todo
+    uint64 public subscriptionId;
+    bytes32 public keyHash;
+    uint32 callbackGasLimit = 100000;
+    uint16 requestConfirmations = 3;
+    uint32 numWords = 1;
+
+    // Lottery variables
+    address public owner_vrf;
+    address[] public players;
+    uint256 public lotteryEndTime;
+    uint256 public entryFee;
+    bool public lotteryActive;
+    address public winner;
+
+    // VRF Randomness request ID
+    uint256 public requestId;
+
+    // Events
+    event LotteryStarted(uint256 duration, uint256 entryFee);
+    event PlayerEntered(address indexed player);
+    event WinnerPicked(address indexed winner, uint256 amount);
+
+    modifier onlyOwner_vrf() {
+        require(msg.sender == owner_vrf, "Only owner_vrf can call this function");
+        _;
+    }
+
+    modifier lotteryOngoing() {
+        require(lotteryActive, "Lottery is not active");
+        require(block.timestamp < lotteryEndTime, "Lottery has ended");
+        _;
+    }
+
+    modifier lotteryEnded() {
+        require(lotteryActive, "Lottery is not active");
+        require(block.timestamp >= lotteryEndTime, "Lottery is still running");
+        _;
+    }
+
+    // Start a new lottery
+    function startLottery(uint256 duration, uint256 _entryFee) external onlyOwner_vrf {
+        require(!lotteryActive, "A lottery is already active");
+
+        delete players;
+        winner = address(0);
+        entryFee = _entryFee;
+        lotteryEndTime = block.timestamp + duration;
+        lotteryActive = true;
+
+        emit LotteryStarted(duration, entryFee);
+    }
+
+    // Players enter the lottery
+    function enterLottery() external payable lotteryOngoing {
+        require(msg.value == entryFee, "Incorrect entry fee");
+        players.push(msg.sender);
+        emit PlayerEntered(msg.sender);
+    }
+
+    // Request randomness to pick the winner
+    function pickWinner() external onlyOwner_vrf lotteryEnded {
+        require(players.length > 0, "No players entered the lottery");
+
+        // Request a random number from Chainlink VRF
+        requestId = COORDINATOR.requestRandomWords(
+            keyHash,
+            subscriptionId,
+            requestConfirmations,
+            callbackGasLimit,
+            numWords
+        );
+    }
+
+    // Chainlink VRF callback - selects the winner
+    function fulfillRandomWords(uint256, uint256[] memory randomWords) internal override {
+        require(lotteryActive, "Lottery is not active");
+
+        uint256 winnerIndex = randomWords[0] % players.length;
+        winner = players[winnerIndex];
+
+        // Transfer the lottery prize to the winner
+        uint256 prizeAmount = address(this).balance;
+        payable(winner).transfer(prizeAmount);
+
+        lotteryActive = false;
+
+        emit WinnerPicked(winner, prizeAmount);
+    }
+
+    // Get current players
+    function getPlayers() external view returns (address[] memory) {
+        return players;
+    }
 }
+
+
 
 contract MultiSig {
     address public owner;
+
+    function multiSign() public {
+        
+    }
 
     // - This function should be implemented by contracts which desire to sign messages (smart contract wallets, DAOs, multisignature wallets) 
     // - Applications wanting to support contract signatures should call this method if the signer is a contract.

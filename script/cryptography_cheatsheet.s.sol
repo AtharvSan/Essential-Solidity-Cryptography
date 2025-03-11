@@ -12,7 +12,7 @@ contract cryptography_cheatsheetScript is Script {
     function run() public {
         vm.startBroadcast();
 
-        c = new cryptography_cheatsheet();
+        // c = new cryptography_cheatsheet();
 
         vm.stopBroadcast();
     }

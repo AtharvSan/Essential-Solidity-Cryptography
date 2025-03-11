@@ -1,0 +1,2 @@
+@openzeppelin/=lib/openzeppelin-contracts/
+@chainlink/v0.8/vrf/=lib/chainlink-brownie-contracts/contracts/src/v0.8/vrf/

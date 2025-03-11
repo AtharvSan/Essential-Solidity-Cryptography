@@ -8,7 +8,7 @@ contract cryptography_cheatsheetTest is Test {
     cryptography_cheatsheet public c;
 
     function setUp() public {
-        c = new cryptography_cheatsheet();
+        // c = new cryptography_cheatsheet();
     }
 
 }
