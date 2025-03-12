@@ -22,7 +22,7 @@ import "@chainlink/v0.8/vrf/VRFConsumerBaseV2.sol";
 //      - Collision Resistance(uniqueness) – No two different inputs should produce the same output
 //      - Preimage Resistance(non reversibility) – Given a output, it should be infeasible to find the original input.
 //      - Avalanche Effect – A small change in input should result in a completely different output
-//      - deterministic - same output for same input
+//      - deterministic system - getting outputs from fixed processes (same output for same input)
 //      - Integrity(tamper proof): Guarantees that data has not been altered or tampered with.
 //      - Semantic Security – Ciphertext leaks no partial information about plaintext.
 //      - encryption: locking
@@ -34,7 +34,7 @@ import "@chainlink/v0.8/vrf/VRFConsumerBaseV2.sol";
 //      - Confidentiality: only authorized parties can access the information.
 //      - Authentication: Verifies the identity of communicating parties.
 //      - non-repudiation: proof of action
-//      - anonymity: no one knows who is interacting with the data
+//      - anonymity: no one knows who is interacting
 //      - signatures(proof of order)
 // - verifiability: proof of correctness
 
@@ -155,9 +155,9 @@ contract cryptography_cheatsheet is VRFConsumerBaseV2 {
     }
 
 
-    /* 6. EIP712 structured data hashing and signing -------------------*/
-    // - the problem : complex data structures are hard to sign and verify
-    // - the solution : 
+    // 6. EIP712 structured data hashing and signing 
+    // - the problem : complex data structures are hard to sign and verify @todo
+    // - the solution : @todo
     //      - create a standard for hashing and signing structured data
     //      - this helps offchian tools to better understand the onchain data
     // - implementation :
@@ -457,7 +457,7 @@ contract cryptography_cheatsheet is VRFConsumerBaseV2 {
     //      - merkleProof: all the brothers in the pairs upto root to prove the membership of an element
     //          - A path of hashes in the tree needed to recompute the Merkle root.
     //      - leaf: hash of an element in the set
-    bytes32 public merkleRoot;
+    bytes32 public merkleRoot; //@todo complementary offchain code
     function verifyMember(bytes32[] memory merkleProof) view public {
         // prepare the leaf for the element
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
@@ -580,7 +580,7 @@ contract cryptography_cheatsheet is VRFConsumerBaseV2 {
 
 
 
-contract MultiSig {
+contract MultiSig { //@todo
     address public owner;
 
     function multiSign() public {
@@ -616,7 +616,7 @@ contract MultiSig {
     }
 }
 
-interface IERC1271Wallet {
+interface IERC1271Wallet { //@todo
         // bytes4 constant internal MAGICVALUE = bytes4(keccak256("isValidSignature(bytes32,bytes)");
         function isValidSignature(bytes32 _hash, bytes memory _signature) external view returns (bytes4 magicValue);
     }
