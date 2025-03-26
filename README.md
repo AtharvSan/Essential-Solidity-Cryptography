@@ -21,7 +21,22 @@ Short notes and compilable cheatsheet of essential cryptography for solidity dev
 12. randomness generation chainlink vrf
 
 ### Getting started
-1. git clone https://github.com/AtharvSan/cryptography_cheatsheet.git
-2. forge install
-3. forge compile
-4. forge test
+1. clone the repo into your system
+```bash
+git clone https://github.com/AtharvSan/cryptography_cheatsheet.git
+```
+
+2. install dependencies
+```bash
+forge install
+```
+
+3. compile
+```bash
+forge compile
+```
+
+4. test
+```bash
+forge test
+```
