@@ -45,6 +45,7 @@ Part 3 of a 5 part series on essentials for solidity devs
 
 ## License
 This project is licensed under the GNU General Public License v3.0 (GPL)
+
 ---
 
 **Found this useful?** consider dropping a [star ⭐](https://github.com/AtharvSan/Essential-Solidity-Cryptography) , your support will motivate me to do more such works.
