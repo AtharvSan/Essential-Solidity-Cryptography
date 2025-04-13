@@ -2,17 +2,17 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {cryptography_cheatsheet} from "../src/cryptography_cheatsheet.sol";
+import "src/EssentialCryptography.sol";
 
-contract cryptography_cheatsheetScript is Script {
-    cryptography_cheatsheet public c;
+contract cryptographyScript is Script {
+    EssentialCryptography public c;
 
     function setUp() public {}
 
     function run() public {
         vm.startBroadcast();
 
-        // c = new cryptography_cheatsheet();
+        // c = new EssentialCryptography();
 
         vm.stopBroadcast();
     }

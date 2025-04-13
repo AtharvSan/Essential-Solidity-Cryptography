@@ -1,65 +1,97 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+// --- part 3 of a 5 part series on essentials for solidity devs ---
+// - Essential-Solidity  (https://github.com/AtharvSan/Essential-Solidity)
+// - Essential-EVM-Assembly  (https://github.com/AtharvSan/Essential-EVM-Assembly)
+// - Essential-Solidity-Cryptography  (https://github.com/AtharvSan/Essential-Solidity-Cryptography)
+// - Essential-Solidity-Design-Patterns
+// - Essential-Solidity-Security
 
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+
+/* table of contents -------------------*/
+// --- trivia ---
+// - properties: computation environment
+// - properties: cryptography
+// - cryptographic terms and definitions
+
+// --- concepts ---
+// - Hash functions
+// - Encryption
+// - Elliptic Curves and keys
+// - Signatures
+// - EIP191 signed_data standard
+// - EIP712 typed structured data hashing and signing
+// - Signature verification
+// - EIP2612 signed approvals for erc20 tokens
+// - EIP1271: ecrecover for multi-account signatures
+// - commit reveal mechanism
+// - merkle proofs
+// - Randomness generation
 
 
-/* computation environments ------------------------*/
+/* trivia --------------------------------------*/
+// --- properties in computation environment  ---
 // - onchain
 //      - immutable
 //      - transparent
 // - offchain
-//      - heavy computations
-//      - privacy
+//      - cheap to compute
+//      - excellent privacy
 // notes: use cryptographic proofs to bridge off-chain to on-chain
 
-/* properties in cryptography ----------------------*/
+// --- properties in cryptography ---
 // - data 
 //      - easy reference to data: hash is an easy reference to data thats easy to deal with than the actual data
-//      - randomness: no predictability in output
 //      - Collision Resistance(uniqueness): No two different inputs should produce the same output
 //      - Preimage Resistance(non reversibility): Given a output, it should be infeasible to find the original input.
 //      - Avalanche Effect: A small change in input should result in a completely different output
 //      - deterministic system: getting outputs from fixed processes (same output for same input)
-//      - Integrity(tamper proof): Guarantees that data has not been altered or tampered with.
-//      - Semantic Security: Ciphertext leaks no partial information about plaintext.
+//      - randomness: no predictability in output
 //      - encryption: locking
 //      - decryption: unlocking
+//      - Integrity(tamper proof): Guarantees that data has not been altered or tampered with.
+//      - Semantic Security: Ciphertext leaks no partial information about plaintext.
 //      - Zero-Knowledge Proofs: Prove knowledge of a secret without revealing it.
 // - participants
-//      - trust: you will have to know the character before you can interact with them
-//      - trustless: you can interact with anyone without knowing them
+//      - trust: you will have to know character of the participant before you can interact with them
+//      - trustless: you can interact with anyone without knowing their character
 //      - Confidentiality: only authorized parties can access the information.
 //      - Authentication: Verifies the identity of communicating parties.
-//      - non-repudiation: proof of action
+//      - non-repudiation: non deniability of action
 //      - anonymity: no one knows who is interacting
 //      - signatures(proof of order)
-// - verifiability: proof of correctness
+// - general
+//      - verifiability: proof of correctness
 
-/* cryptographic terms and definitions ------------------*/
-// - hash: a fixed-size string of bytes that uniquely represents a certain data. 
-//      - use : data integrity, data representation
-// - salt: A random value added to input data before hashing, salting ensures that identical inputs produce different hash outputs.
-//      - use : protecting against precomputed attacks like rainbow tables.
+// --- cryptographic terms and definitions ---
 // - seed: a crucial input value 
 //      - use : to initialize cryptographic algorithms, particularly those involving randomness.
-// - key: derived from a seed using key derivation functions (KDFs)
+// - key: a special value derived from a seed using key derivation functions (KDFs)
 //      - use : encryption(public key), decryption(pvt key)
-// - nonce: a 'n'umber used 'once' are intended to create uniqueness.
-//      - use : to prevent replay attacks.
 // - encryption decryption: locking unlocking
 //      - use : secure communications
-// - plain text: human readable text
-// - cypher text: cryptic text output after plain text is encrypted
+// - plain text: human readable text, this is the data that we want to protect from interception
+// - cypher text: cryptic text output that we get after plain text is encrypted
+// - hash: a fixed-size of bytes that uniquely represents a certain data. 
+//      - use : data integrity, data representation
+// - salt: A random value added to input data before hashing, ensures that same inputs produce different hash outputs.
+//      - use : protecting against precomputed attacks like rainbow tables.
+// - nonce: a 'n'umber used 'once' intended to create uniqueness.
+//      - use : to prevent replay attacks.
 // - signature: proof of origin
-//      - use : identify who created the txn
+//      - use : identify who initiated the txn
 // - signed data: the data on which signature is being created
 // - signed order: the order to be executed along with the signature
 //      - use : delegating orders to third party
 
+
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+
+
 /// @author AtharvSan
-/// @dev Short notes and compilable cheatsheet of essential cryptography for solidity devs (educational purposes only)
-contract cryptography_cheatsheet {
+/// @dev part 3 : essential cryptography for solidity devs
+contract EssentialCryptography {
     
     constructor(bytes32 _merkleRoot) {
         // 8. eip2612 signed approval (signed orders)
@@ -70,8 +102,8 @@ contract cryptography_cheatsheet {
         merkleRoot = _merkleRoot;
     }
 
-    /* 1. Hash functions --------------------------------------------*/
-    // - the problem : data is sometimes too big its hard to point out the exact data(if the data be corrupted)
+    // 1. Hash functions ----------------------------//
+    // - the problem : big data has the risk is sometimes too big its hard to point out the exact data(if the data gets corrupted)
     // - the solution : the data is shortened down to few bytes, now its way easier to give reference to exact data
     // - implementation : keccak256(bytes data) --> bytes32
     // - properties (specially engineered features) :
@@ -87,13 +119,13 @@ contract cryptography_cheatsheet {
     bytes32 public ATHARVSAN_SALTED = keccak256(abi.encodePacked("atharvsan",salt)); 
 
 
-    /* 2. Encryption ------------------------------------------------*/
+    // 2. Encryption ---------------------------------//
     // - the problem : communications can be intercepted
     // - the solution : develop a 'lock and key' system to protect the communication from interception
     // - implementation : OFFCHAIN encryption by wallets
 
 
-    /* 3. Elliptic Curves and keys ----------------------------------*/
+    // 3. Elliptic Curves and keys -------------------//
     // - the problem : strangers not able to open the encrypted lock
     // - the solution : seperation of keys for locking and opening. Anyone can lock but only the reciever can open.
     // - implementation : OFFCHAIN key computation using the secp256k1 curve
@@ -111,7 +143,7 @@ contract cryptography_cheatsheet {
     //          - generated by doing elliptic curve multiplication on the pvt key
 
 
-    /* 4. Signatures ------------------------------------------------*/
+    // 4. Signatures ---------------------------------//
     // - the problem : secure communication with strangers became possible, but no info on who sent the message
     // - the solution : sender sends his signature along with the data
     // - implementation : 
@@ -125,7 +157,7 @@ contract cryptography_cheatsheet {
     //      - signature(bytes32 r, bytes32 s, uint8 v) is a 65-byte data created by ECDSA using data and pvt key
 
 
-    /* 5. EIP191 signed_data standard --------------------------------*/
+    // 5. EIP191 signed_data standard -----------------//
     // - the problem: 
     //      - presigned txns getting confused with standard txns as there was no standard to differentiate in 'signed_data' and 'RLPdata'
     //      - the signed_data was not standardized, caused confusion in verification
@@ -159,7 +191,7 @@ contract cryptography_cheatsheet {
     }
 
 
-    /* 6. EIP712 typed structured data hashing and signing --------------*/
+    // 6. EIP712 typed structured data hashing and signing --------------//
     // - the problem : users are shown cryptic messages when they create signatures in wallets
     // - the solution : 
     //      - create a standard for hashing and signing typed structured data
@@ -236,7 +268,7 @@ contract cryptography_cheatsheet {
     }
 
 
-    /* 7. Signature verification ----------------------------------*/
+    // 7. Signature verification -------------------------//
     // - the problem : signatures are handled at infrasturcture level, but if you choose to do it yourself you will need to do handle
     //   both signature creation(offchain) and signature verification(onchain) independently
     // - the solution : create offchain signatures using ECDSA, and include a function in smart contracts that verifies the signature using ecrecover
@@ -254,9 +286,9 @@ contract cryptography_cheatsheet {
         return true;
     }
 
-    // @todo what is passed in functions? (signed_data, vrs), (order params, vrs), or just (vrs)
+    // @audit what is passed in functions? (signed_data, vrs), (order params, vrs), or just (vrs)
 
-    /* 8. EIP2612 signed approvals for erc20 tokens @todo */
+    // 8. EIP2612 signed approvals for erc20 tokens //
     // - the problem : ERC20 operation is attached to msg.sender for its builtin signature handling
     // - the solution : we decouple ERC20 from msg.sender by implementing signature handling independently 
     //      - offchain signature creation (v, r, s): eth_signTypedData_v4
@@ -319,7 +351,7 @@ contract cryptography_cheatsheet {
                         keccak256(
                             abi.encode(
                                 keccak256(
-                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)" //@todo why not the entire permit function, whats going on?
+                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)" //@audit why not the entire permit function, whats going on?
                                 ),
                                 owner,
                                 spender,
@@ -362,7 +394,7 @@ contract cryptography_cheatsheet {
     }
 
 
-    /* 9. EIP1271: ecrecover for multi-account signatures @todo */
+    // 9. EIP1271: ecrecover for multi-account signatures //
     // - the problem : no native support to handle(generate and verify) multi account signatures
     // - the solution :
     //      - create signatures(anywhere onchain offchain) without ECDSA (cuz contracts dont have pvt keys) using EOA signatures as base components 
@@ -391,7 +423,7 @@ contract cryptography_cheatsheet {
     //      - multi account signatures must contain each account's individual vrs components as produced from ECDSA, as these components 
     //        can't be fabricated by third party.
     //      - standardizes verification, not creation.
-    function validate_contractSigner(bytes32 signed_data, bytes calldata jointSignature, address multiSig_wallet) external view { //@todo about the params?
+    function validate_contractSigner(bytes32 signed_data, bytes calldata jointSignature, address multiSig_wallet) external view { //@audit about the params?
         // acutally signed_data is never given, its in the form of order(the params to function). signed_data is meant to be reconstructed.
         // - cheatsheet calls multisig wallet to verify the signature
         bytes4 result = IERC1271Wallet(multiSig_wallet).isValidSignature(signed_data, jointSignature);
@@ -399,7 +431,7 @@ contract cryptography_cheatsheet {
     }
     
 
-    /* 10. commit reveal mechanism -------------------------*/
+    // 10. commit reveal mechanism -------------------------//
     // - the problem :
     //      - in coordinated efforts like voting or auctions, notorious users can change submissions as and when they feel.
     //      - mempool is transparent and plain text data in txns is easy to intercept, bots can read the txns and frontrun as they suit. 
@@ -435,7 +467,7 @@ contract cryptography_cheatsheet {
     }
 
 
-    /* 11. merkleRoot: an advanced hash, now you can interact with it --------------------*/
+    // 11. merkleRoot: an advanced hash, now you can interact with it --------------------//
     // - objective :
     //     - verify membership of an element in a set
     // - the problem : 
@@ -493,6 +525,9 @@ contract cryptography_cheatsheet {
     //      - Decentralized: Combines oracle secrets, user input, and blockchain state.
     // - use cases : 
     //      - fairness in distribution (lottery, in-game mechanisms)
+
+    
+    // 13. ERC 7683 : Cross Chain Intents
 }
 
 /// @dev 2/3 multisig account
