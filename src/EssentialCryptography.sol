@@ -5,18 +5,6 @@
 // - Essential-Solidity-Design-Patterns
 // - Essential-Solidity-Security
 
-//@note business development
-// --- marketing ---
-// - setup a doubt class if it crosses 10 stars on github
-// - write trailer blogs
-// - give updates of release notes on twitter
-// - reply on twitter
-// - create excalidraw mindmaps
-// - use references to big accounts
-// - ask for shoutouts for big accounts
-
-// --- sales ---
-
 
 /* table of contents -------------------*/
 // --- trivia ---
