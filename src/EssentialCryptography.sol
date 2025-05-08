@@ -5,15 +5,31 @@
 // - Essential-Solidity-Design-Patterns
 // - Essential-Solidity-Security
 
+//@note business development
+// --- marketing ---
+// - setup a doubt class if it crosses 10 stars on github
+// - write trailer blogs
+// - give updates of release notes on twitter
+// - reply on twitter
+// - create excalidraw mindmaps
+// - use references to big accounts
+// - ask for shoutouts for big accounts
+
+// --- sales ---
+
 
 /* table of contents -------------------*/
 // --- trivia ---
 // - properties: computation environment
 // - properties: cryptography
 // - cryptographic terms and definitions
+// - foundational tools
 
 // --- concepts ---
 // - Hash functions
+// - salting
+// - commit reveal mechanism
+// - merkle proofs
 // - Encryption
 // - Elliptic Curves and keys
 // - Signatures
@@ -22,29 +38,32 @@
 // - Signature verification
 // - EIP2612 signed approvals for erc20 tokens
 // - EIP1271: ecrecover for multi-account signatures
-// - commit reveal mechanism
-// - merkle proofs
-// - Randomness generation
+// - Randomness onchain
+
+// --- roadmap ---
+// - ERC 7683 Cross Chain Intents
+// - Zero Knowledge Proofs
 
 
 /* trivia --------------------------------------*/
 // --- properties in computation environment  ---
 // - onchain
-//      - immutable
+//      - sovereign transactions (cencorship resistant)
 //      - transparent
 // - offchain
 //      - cheap to compute
 //      - excellent privacy
-// notes: use cryptographic proofs to bridge off-chain to on-chain
+// notes: use cryptographic proofs to bridge off-chain and on-chain states.
 
 // --- properties in cryptography ---
 // - data 
 //      - easy reference to data: hash is an easy reference to data thats easy to deal with than the actual data
-//      - Collision Resistance(uniqueness): No two different inputs should produce the same output
-//      - Preimage Resistance(non reversibility): Given a output, it should be infeasible to find the original input.
-//      - Avalanche Effect: A small change in input should result in a completely different output
-//      - deterministic system: getting outputs from fixed processes (same output for same input)
+//      - Collision Resistance: No two different inputs produce the same output
+//      - Preimage Resistance(non reversibility): Given a output, it is infeasible to find the original input.
+//      - Avalanche Effect: A small change in input results in a completely different output
+//      - deterministic: getting outputs from fixed processes (same output for same input)
 //      - randomness: no predictability in output
+//      - uniqueness: data is different from all others
 //      - encryption: locking
 //      - decryption: unlocking
 //      - Integrity(tamper proof): Guarantees that data has not been altered or tampered with.
@@ -70,10 +89,12 @@
 //      - use : secure communications
 // - plain text: human readable text, this is the data that we want to protect from interception
 // - cypher text: cryptic text output that we get after plain text is encrypted
+// - secret : a data that is meant to be known only to the owner
+//      - use : commit reveal scheme, voting, auctions
 // - hash: a fixed-size of bytes that uniquely represents a certain data. 
 //      - use : data integrity, data representation
-// - salt: A random value added to input data before hashing, ensures that same inputs produce different hash outputs.
-//      - use : protecting against precomputed attacks like rainbow tables.
+// - salt: A random value added to input data before hashing
+//      - use : protecting against brute force attacks like rainbow tables.
 // - nonce: a 'n'umber used 'once' intended to create uniqueness.
 //      - use : to prevent replay attacks.
 // - signature: proof of origin
@@ -82,12 +103,17 @@
 // - signed order: the order to be executed along with the signature
 //      - use : delegating orders to third party
 
+// --- foundational tools ---
+// - secp256k1: ethereum's elliptic curve that is foundational to keys, encryption and signatures
+// - ECDSA: create signatures using secp256k1
+// - ecrecover: recover the signer from the signature using secp256k1
+// - keccak256: ethereum's hash function
+
 
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-
 
 /// @author AtharvSan
 /// @dev part 3 : essential cryptography for solidity devs
@@ -102,33 +128,165 @@ contract EssentialCryptography {
         merkleRoot = _merkleRoot;
     }
 
-    // 1. Hash functions ----------------------------//
-    // - the problem : big data has the risk is sometimes too big its hard to point out the exact data(if the data gets corrupted)
-    // - the solution : the data is shortened down to few bytes, now its way easier to give reference to exact data
-    // - implementation : keccak256(bytes data) --> bytes32
+    /* hash functions -----------------------*/
+    // - the problem:
+    //      - referencing crucial data directly is prone to silly errors (like function signatures)
+    //      - Working with large data directly is error-prone and inefficient.
+    //      - plain text secrets can be accessed by attackers and extracted from contract state.
+    // - the solution:
+    //      - create compact fingerprint of the data. It helps in both, data integrity and covering up of secrets.
+    //      -------------------------------------------------------------------------------------------------------------------------------------
+    //      |  . . . . . . . . . . . . . . . . . . . . . . . . . .                                                                              |
+    //      |  . . . . . . . . . . . . . . . . . . . . . . . . . .                                                                              |
+    //      |  . . . . . . . . . . . . . . . . . . . . . . . . . .     -->    **************                                                    |
+    //      |  . . . . . . . . . . . . . . . . . . . . . . . . . .                                                                              |
+    //      |  . . . . . . . . . . . . . . . . . . . . . . . . . .                    `--> short hash output only 32 bytes                      |
+    //      |  . . . . . . . . . . . . . . . . . . . . . . . . . .                         (no correlation to input, good for keeping secrets)  |
+    //      |                                                                                                                                   |
+    //      |                           |                                                                                                       |
+    //      |                           `--> plain text data                                                                                    |
+    //      -------------------------------------------------------------------------------------------------------------------------------------
+    // - Implementation: 
+    //      - keccak256(bytes memory)  →  bytes32
     // - properties (specially engineered features) :
-    //      - collision resistance : unique and short output
-    //      - fast to compute
-    //      - deterministic : same input will always give same output
-    //      - avalanche effect : small change in input will result in completely different output
-    //      - pre-image resistance : given output, very hard to find input that gives that output
-    //      - fixed output size : always gives same size output
-    bytes32 public ATHARVSAN = keccak256("atharvsan"); 
+    //     *1  avalanche effect : small change in input will result in drastically different output
+    //      2  short hash
+    //     *3  obfuscation : output is very different to the input, no correlation
+    //     *4  pre-image resistance : given output, very hard to find input that generates that output
+    //      -  collision resistance : unique hash
+    //      -  deterministic : same input will always give same output
+    //      -  fixed output size of 32 bytes
+    //      -  fast to compute
+    // - use cases: 
+    //      - data integrity: reference to the exact data with pin point accuracy (1. avalanche effect)
+    //      - commiting secrets: covering up the secrets (3. obfuscation and  4. pre-image resistance)
+    // - example:
+    // hashes are great at dealing with data with pin point accuracy. Even a slight change in data is easily evident when hash values are used.
+    bytes32 public real_name = keccak256("AtharvSan"); //0x930b8dfd2e331b73a97ba6d9de99459d54f4a44fe1380b014c78a10cc68a0f20
+    bytes32 public small_mistake_in_name = keccak256("atharvsan"); //0xbbefe4dfe80e6a074139e9cd958be264dfb3ed25b010865e1181c9b97683da88
 
-    bytes32 salt = bytes32(uint256(0x12345678));
-    bytes32 public ATHARVSAN_SALTED = keccak256(abi.encodePacked("atharvsan",salt)); 
+
+    /* salted hashing --------------------------*/
+    // - the problem:
+    //      - some systems demand uniqueness for each hash value
+    //      - it is very easy to brute force the hash generated from smaller size secrets 
+    // - the solution: add a salt value 
+    //      - add an additional value(called salt) to the data and make the input to hash function quite bigger
+    // - Implementation:
+    //     bytes32 salted_hash = keccak256(abi.encode("data", salt));
+    // - properties: 
+    //      - salting makes input to hash functions a lot bigger
+    //      - salting makes the hash values unique even for the same primary data
+    //      - when salting is intended for uniqueness of hash 
+    //          - salt is generated from a deterministic process
+    //          - unique salt value for each instance of primary data
+    //      - when salting is intended for covering up of secrets
+    //          - salt is a random value
+    //          - salt is a secret
+    // - use cases :
+    //      - creates uniqueness where needed like 
+    //          - create2 addresses, cross chain messages, eip712 
+    //      - risk free use of smaller secrets for generating hash values
 
 
-    // 2. Encryption ---------------------------------//
-    // - the problem : communications can be intercepted
-    // - the solution : develop a 'lock and key' system to protect the communication from interception
-    // - implementation : OFFCHAIN encryption by wallets
+    // commit reveal mechanism -------------------------//
+    // - the problem :
+    //      - in coordinated efforts like voting or auctions, notorious users can change submissions as and when they feel.
+    //      - mempool is transparent and plain text data in txns is easy to intercept, bots can read the txns and frontrun as they suit. 
+    // - the solution : 
+    //      - commit reveal mechanism, commit the hash of secret onchain and reveal the secret at the right time.
+    // - implementation : 
+    //      - commit: save the hash of your secret onchain
+    //      - reveal: reveal your secret at the appropriate time, so that anyone can cross verify with the hash.
+    // - use cases :
+    //      - fairness in participation (voting, auctions, games)
+    struct Commitment {
+        bytes32 commitHash;
+        bool revealed;
+    }
+    mapping(address => Commitment) public commitments;
+    mapping(address => string) public secrets;
+
+    function commit(bytes32 _commitHash/* keccak256(abi.encodePacked(_secret, _salt)) */) external {
+        require(commitments[msg.sender].commitHash == bytes32(0), "Already committed");
+        commitments[msg.sender] = Commitment(_commitHash, false);
+    }
+
+    function reveal(string memory _secret, uint256 _salt) external {
+        // 1. sanity checks
+        Commitment storage userCommitment = commitments[msg.sender];
+        require(userCommitment.commitHash != bytes32(0), "No commitment found");
+        require(!userCommitment.revealed, "Already revealed");
+        // 2. Verify the hash
+        require(userCommitment.commitHash == keccak256(abi.encodePacked(_secret, _salt)), "Invalid reveal");
+        userCommitment.revealed = true;
+        // 3. Process revealed value (e.g., store or use it)
+        secrets[msg.sender] = _secret;
+    }
 
 
-    // 3. Elliptic Curves and keys -------------------//
-    // - the problem : strangers not able to open the encrypted lock
-    // - the solution : seperation of keys for locking and opening. Anyone can lock but only the reciever can open.
-    // - implementation : OFFCHAIN key computation using the secp256k1 curve
+    // merkleRoot: an advanced hash, now you can interact with it --------------------//
+    // - objective :
+    //     - verify membership of an element in a set
+    // - the problem : 
+    //      - you can't store big list of users onchain, thats expensive. Hashes are small bytes32 values, but you can not interact with them.
+    //      - if you store some small value like hash, how do you prove membership of an element that made up the hash. 
+    // - the solution : 
+    //      - you use merkle root that are small cuz its a hash at the end, but its special that you can interact with it.
+    // - implementation :
+    //      - 1. create a merkelRoot offchain (in ethers.js or Python) out of the set of elements and store it onchain
+    //      - 2. to verify membership, you will need the merkleProof and the leaf ready for that particular element. You need to generate 
+    //        the merkleProof offchain (in ethers.js or Python) before sending it to Solidity.
+    //      - 3. just call the verifyMember function with the leaf and merkleProof, it verifies the proof and tells if the element was included in
+    //        the calculation of the root hash.
+    // - properties : 
+    //      - small size of merkle root
+    //      - interactable: you can verify if an element was included in calculation of the root hash
+    //      - minimal computation: 
+    //          - building the merkleTree : O(N)
+    //          - everything else: O(logN)
+    // - use cases : 
+    //      - save gas on verifing a user's membership
+    //      - Prove a file’s integrity without storing it fully on-chain
+    // - trivia :
+    //      - merkleRoot: the final single hash at the top of the tree.
+    //          - Leaf nodes contain the hashes of individual data elements.
+    //          - Each parent node is the hash of its two child nodes.
+    //          - The merkle root is the final single hash at the top of the tree.
+    //      - merkleProof: all the brothers in the pairs upto root to prove the membership of an element
+    //          - A path of hashes in the tree needed to recompute the Merkle root.
+    //      - leaf: hash of an element in the set
+    // - scenario :
+    //      - verify if the caller is a member of allowlist
+    bytes32 public merkleRoot; 
+    function verifyMember(bytes32[] memory merkleProof) view public {
+        // prepare the leaf for the element
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        
+        // recreating merkleRoot using leaf and Proof, to match if its indeed the root. That tells if leaf was included in calculation of merkelRoot.
+        require(MerkleProof.verify(merkleProof, merkleRoot, leaf),"invalid proof");
+    }
+
+
+    /* Simple Encryption ----------------------------*/
+    // - the problem : 
+    //      - communications can be intercepted
+    // - the solution : 
+    //      - a 'lock and key' system to protect the communication from interception
+    // - use cases : 
+    //      - used in secure communications
+
+
+    /* Elliptic Curves, keys and Asymetric Encryption ---------------*/
+    // - the problem : 
+    //      - to use locks you need to have the keys with you and thats why establishing communication with strangers becomes a problem.
+    // - the solution : 
+    //      - seperation of keys for locking and opening. 
+    //      - Locking key is made public, so anyone can lock but only the reciever can open.
+    //      - now its possible to communicate with strangers cuz they have made their locking system public (opening key is private to recipient)
+    // - implementation : 
+    //      - key generation: implemented by wallets using the secp256k1 curve. 
+    //      - asymetric encryption: is done offchain, communication is locked using public key of recipient and opened using private key of recipient
     // - properties : 
     //      - pvt key: 
     //          - opens the encrypted lock
@@ -136,48 +294,111 @@ contract EssentialCryptography {
     //      - public key:
     //          - closes the encryption lock
     // - trivia :
-    //      - each account has its own lock, use the account's public key to use it.
+    //      - tx to smart contract is not encrypted, just signed with pvt key of eoa.
+    //      - each account has its own lock, use the account's public key to access the locking system.
     //      - pvt key :
-    //          - randomly generated 256-bit key using random number generator from the OS
+    //          - randomly generated 256-bit key (subject to constraints from secp256k1)
     //      - pub key :
     //          - generated by doing elliptic curve multiplication on the pvt key
+    //      - signature verification is the only elliptic curve computation that is done onchain, everything else is offchain
 
 
-    // 4. Signatures ---------------------------------//
-    // - the problem : secure communication with strangers became possible, but no info on who sent the message
-    // - the solution : sender sends his signature along with the data
-    // - implementation : 
-    //      - signatures are created OFFCHAIN using ECDSA, but verification can be done onchain with ecrecover
-    //          - signatures generated by wallets: standard transactions <RLPdata,r,s,v>
-    //          - generated by offchain scripts: signed orders <signed_data,r,s,v>
-    //              - create signed_data according to eip191
-    //              - ECDSA(signed_data,pvt_key) --> v,r,s
-    // - trivia :
-    //      - signatures are created offchain, so this is a gasless process.
-    //      - signature(bytes32 r, bytes32 s, uint8 v) is a 65-byte data created by ECDSA using data and pvt key
-
-
-    // 5. EIP191 signed_data standard -----------------//
+    // Signatures ---------------------------------//
+    // --- intro ---
     // - the problem: 
-    //      - presigned txns getting confused with standard txns as there was no standard to differentiate in 'signed_data' and 'RLPdata'
-    //      - the signed_data was not standardized, caused confusion in verification
+    //      - strangers could receive communication messages but couldn't figure out who sent the message
     // - the solution: 
-    //      - setting a standard for differentiating 'signed_data' from 'RLPdata' (initiate with 0x19)
-    //      - creating a standard scheme for 'signed_data', to avoid confusion while verifying
+    //      - sender sends his signature along with the data
+    //      - signature is a proof of origin, so the receiver can identify the real sender
+    // - trivia:
+    //      - participants: user, wallet, dapp frontend, dapp backend, ethereum node, contract
+    //      - signable objects
+    //          - transactions (𝕋)
+    //          - bytestrings (𝔹⁸ⁿ)
+    //          - structured data (𝕊)
+    //      - all signatures are created offchain usually by the wallets
+    //      - pvt key never leaves the wallet (ethereum node directly gets the signature from the wallet)
+    //      - ethereum uses ECDSA as its signature creation algorithm which uses secp256k1 under the hood
+    //      - default ECDSA libraries like OpenSSL give seperate 32-byte r and s as output
+    //      - but Ethereum wallets and ethereum clients combine them into the 65-byte package because that's the format used in ethereum signatures
+    //          - v is the recovery id, r and s are the signature values
+    //          - it is packed as a single 65-byte value in the order --> r s v
+
+    // --- standard trnansactions ---
+    // - use case:
+    //      - standard transactions are meant for immidiate onchain actions with all strings attached to msg.sender
+    // - signature creation
+    //      - signature for standard transactions is automatically handled by wallets when user signs the transaction
+    //          - wallet serializes the transaction object using RLP encoding
+    //          - wallet creates a signature on RLP encoded data then sends the tx to ethereum node using eth_sendRawTransaction
+    // - signer recovery
+    //      - signer recovery is builtin, evm makes the msg.signer available globally (ecrecover used under the hood)
+    // - trivia:
+    //      - Wallet sends signed transactions on-chain. Dapp frontend backend do not interfere.
+
+    // --- signed messages ---
+    // - use case:
+    //      - signed messages provide flexibility in authorization designs
+    // - trivia
+    //      - wallets create the signature by signing the signed_data with methods like personal_sign, eth_signTypedData_v4, eth_sign
+    //      - dapp frontend provides the messgaes to sign for and also decides which signing method to call on the wallet
+    //      - signed_data is the data on which signature is created, this data is packed according to eip191 format
+    //      - signed message is a chunk of binary 'signed_data', along with the signature(r,s,v)
+    //      - Signed messages are returned to you — the dApp — to handle however you want.
+    
+    // --- eip191 signed_data format ---
+    // - the problem: 
+    //      - the signed_data was not standardized, it lead to confusion in signer recovery logic
+    // - the solution: 
+    //      - creating a standard scheme for 'signed_data', to avoid confusion while signer recovery
     // - implementation :
     //      - signed_data = hash(encodePacked( 0x19 | version | version_data | data_to_sign ))
-    //      *************************************************************************************************
-    //      eth_sign              -->  0x19 | 0x00   | intended validator | data to sign
-    //      eth_signTypedData_v4  -->  0x19 | 0x01   | domainSeperator    | hashStruct(message)
-    //      personal_sign         -->  0x19 | 0x45(E)| thereum Signed Message:\n"+len(message) | data to sign
-    //      *************************************************************************************************
-    // - trivia :
-    //      - signed_data : the data on which the signature is created
-    //      - signed order : a chunk of binary 'signed_data', along with the signature(r,s,v)
-    //      - standard txn : RLP<nonce, gasPrice, startGas, to, valve, data>, r, s, v
-    //      - helps in verification of off-chain signatures in ethereum ecosystem
-    //      - RPC calls like eth_sign, eth_signTypedData_v4, personal_sign are executed offchain
-    //      - E is 0x45 in ASCII
+    //      ***
+    //      personal_sign (auto arrangement)         -->  0x19 | 0x45(E)| "thereum Signed Message:\n"+len(message) | data to sign
+    //      eth_signTypedData_v4 (auto arrangement)  -->  0x19 | 0x01   |  domainSeperator    | hashStruct(message)
+    //      eth_sign (manual arrangement)            -->  0x19 | 0x00   |  intended validator | data to sign
+
+    // --- personal_sign (signed message) ---
+    // - use case:
+    //      - when you just want to issue authorization and no onchain action
+    // - signature creation
+    //      - the 'message' to be signed is given by the dapp frontend itself
+    //      - personal_sign auto arranges the message as : "0x19Ethereum Signed Message:\n" + length of message + message
+    //      - adding a prefix is like adding a salt to the message, it makes sure the signature from message cant be used as signature for a transaction
+    // - signer recovery
+    //      - onchain or offchain recovery of signer depending on where the signature is sent: ecrecover(signed_data, v, r, s)
+    
+    // --- eth_signTypedData_v4 (signed message) ---
+    // - use case:
+    //      - when you want to issue authorization that can perform onchain actions
+    // - signature creation
+    //      - the 'message' is generally a typed structured data (struct or function)
+    //      - dapp frontend provides all the message data to the wallet
+    //      - eth_signTypedData_v4 auto arranges the message as : 0x19 | 0x01 | domainSeperator | hashStruct(message)
+    // - signer recovery
+    //      - onchain or offchain recovery of signer depending on where the signature is sent: ecrecover(signed_data, v, r, s)
+    // - trivia: 
+    //      - when passing onchain, (order params, v, r, s) is passed to the contract
+
+    // --- eth_sign (signed message) ---
+    // - use case:
+    //      - legacy contracts, low level protocols
+    // - signature creation
+    //      - the 'message' to be signed is given by the dapp frontend itself
+    //      - eth_sign needs manual arrangement of the message as : 0x19 | 0x00 | intended validator | data to sign
+    // - signer recovery
+    //      - onchain or offchain recovery of signer depending on where the signature is sent: ecrecover(signed_data, v, r, s)
+    // - trivia
+    //      - no prefixes, it just signs anything that you throw at it
+    //      - eth_sign makes phishing attacks easy
+    //      - when passing onchain, (order params, v, r, s) is passed to the contract
+    function verify(address owner, bytes calldata data, uint8 v, bytes32 r, bytes32 s) public view returns (bool success) {
+        bytes32 signed_data = keccak256(abi.encodePacked(hex"1900", address(this), data));
+        address signer = ecrecover(signed_data, v, r, s);
+        require(signer == owner, "unauthorized");
+        return true;
+    }
+    
     MultiSig multisig = new MultiSig();
     function Signed_data00() view public returns(bytes32 signed_data00) { 
         bytes memory data00 = "yo multisig, how are you..";
@@ -190,15 +411,16 @@ contract EssentialCryptography {
         signed_data45 = keccak256(abi.encodePacked(hex"1945","thereum Signed Message:\n14",data45));
     }
 
-
-    // 6. EIP712 typed structured data hashing and signing --------------//
-    // - the problem : users are shown cryptic messages when they create signatures in wallets
+    // EIP712 typed structured data signing ------------------------//
+    // - used for anything involving onchain actions
+    // - the problem : 
+    //      - users are shown cryptic messages when they create signatures in wallets
     // - the solution : 
-    //      - create a standard for hashing and signing typed structured data
+    //      - create a standard for signing structured data
     //      - this brings clarity to the end user when he signs via his wallet
     // - implementation :
-    //      - the start of eip712 is mainly offchain when users sign the message using eth_signTypedData
-    //      - the other part is in contracts where they have to reconstruct the signed_data to recover the signer
+    //      - wallet does all the heavy lifting and creates the signature with eth_signTypedData_v4
+    //      - the other part is done inside the contract where signed_data is reconstructed to recover the signer
     //          - contract has a struct for EIP712Domain and structured data(sturct or function)
     //          - create a hashStruct of EIP712Domain and structured data
     //              - typehash: notice that no space after the comma
@@ -212,7 +434,7 @@ contract EssentialCryptography {
     //      - domainSeperator should be unique to the contract and chain to prevent replay attacks from other domains, and satisfy 
     //        the requirements of EIP-712, but is otherwise unconstrained.
     // - use cases :
-    //      - give a better user experience when signing via wallets
+    //      - gives a better user experience when signing via wallets
     // - trivia :
     //      - the typed structured data can be anything like a struct or a function
     struct EIP712Domain {
@@ -268,29 +490,12 @@ contract EssentialCryptography {
     }
 
 
-    // 7. Signature verification -------------------------//
-    // - the problem : signatures are handled at infrasturcture level, but if you choose to do it yourself you will need to do handle
-    //   both signature creation(offchain) and signature verification(onchain) independently
-    // - the solution : create offchain signatures using ECDSA, and include a function in smart contracts that verifies the signature using ecrecover
-    // - implementation : 
-    //      - arrange: recreate the signed_data
-    //      - extraction: ecrecover(signed_data, v, r, s)
-    //      - verification: recovered address == the 'owner' that was included in signed_data
-    // - use cases:
-    //      - no need to transact yourself, create signed orders that can be submitted via 3rd party(relayers) as the process is not depending
-    //        on msg.sender for proof of authentication.
-    function verify(address owner, bytes calldata data, uint8 v, bytes32 r, bytes32 s) public view returns (bool success) {
-        bytes32 signed_data = keccak256(abi.encodePacked(hex"1900", address(this), data));
-        address signer = ecrecover(signed_data, v, r, s);
-        require(signer == owner, "unauthorized");
-        return true;
-    }
-
-    // @audit what is passed in functions? (signed_data, vrs), (order params, vrs), or just (vrs)
-
-    // 8. EIP2612 signed approvals for erc20 tokens //
-    // - the problem : ERC20 operation is attached to msg.sender for its builtin signature handling
-    // - the solution : we decouple ERC20 from msg.sender by implementing signature handling independently 
+    // EIP2612 signed approvals for erc20 tokens ---------------//
+    // - the problem : 
+    //      - ERC20 operations are attached to builtin msg.sender for signer identification, that means you can't use someone else 
+    //        to submit tx on your behalf
+    // - the solution : 
+    //      - we decouple ERC20 from msg.sender by handling signature creation and signer recovery independently 
     //      - offchain signature creation (v, r, s): eth_signTypedData_v4
     //      - submit the order(owner, spender, value, deadline) and the signature (v, r, s) to relayer that will inititate the permit method on token
     //      - create signed_data that will be used in signer extraction: 191, 712, 2612
@@ -351,7 +556,7 @@ contract EssentialCryptography {
                         keccak256(
                             abi.encode(
                                 keccak256(
-                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)" //@audit why not the entire permit function, whats going on?
+                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
                                 ),
                                 owner,
                                 spender,
@@ -394,8 +599,9 @@ contract EssentialCryptography {
     }
 
 
-    // 9. EIP1271: ecrecover for multi-account signatures //
-    // - the problem : no native support to handle(generate and verify) multi account signatures
+    // EIP1271: ecrecover for multi-account signatures -------------------//
+    // - the problem : 
+    //      - no native support to handle(generate and verify) multi account signatures
     // - the solution :
     //      - create signatures(anywhere onchain offchain) without ECDSA (cuz contracts dont have pvt keys) using EOA signatures as base components 
     //        (Notice that signatures can be anything as long as it gives proof of origin)
@@ -423,94 +629,15 @@ contract EssentialCryptography {
     //      - multi account signatures must contain each account's individual vrs components as produced from ECDSA, as these components 
     //        can't be fabricated by third party.
     //      - standardizes verification, not creation.
-    function validate_contractSigner(bytes32 signed_data, bytes calldata jointSignature, address multiSig_wallet) external view { //@audit about the params?
+    function validate_contractSigner(bytes32 signed_data, bytes calldata jointSignature, address multiSig_wallet) external view {
         // acutally signed_data is never given, its in the form of order(the params to function). signed_data is meant to be reconstructed.
         // - cheatsheet calls multisig wallet to verify the signature
         bytes4 result = IERC1271Wallet(multiSig_wallet).isValidSignature(signed_data, jointSignature);
         require(result == 0x1626ba7e, "INVALID_SIGNATURE");
     }
-    
-
-    // 10. commit reveal mechanism -------------------------//
-    // - the problem :
-    //      - in coordinated efforts like voting or auctions, notorious users can change submissions as and when they feel.
-    //      - mempool is transparent and plain text data in txns is easy to intercept, bots can read the txns and frontrun as they suit. 
-    // - the solution : 
-    //      - commit reveal mechanism, commit the hash of secret onchain and reveal the secret at the right time.
-    // - implementation : 
-    //      - commit: save the hash of your secret onchain
-    //      - reveal: reveal your secret at the appropriate time, so that anyone can cross verify with the hash.
-    // - use cases :
-    //      - fairness in participation (voting, auctions, games)
-    struct Commitment {
-        bytes32 commitHash;
-        bool revealed;
-    }
-    mapping(address => Commitment) public commitments;
-    mapping(address => string) public secrets;
-
-    function commit(bytes32 _commitHash/* keccak256(abi.encodePacked(_secret, _salt)) */) external {
-        require(commitments[msg.sender].commitHash == bytes32(0), "Already committed");
-        commitments[msg.sender] = Commitment(_commitHash, false);
-    }
-
-    function reveal(string memory _secret, uint256 _salt) external {
-        // 1. sanity checks
-        Commitment storage userCommitment = commitments[msg.sender];
-        require(userCommitment.commitHash != bytes32(0), "No commitment found");
-        require(!userCommitment.revealed, "Already revealed");
-        // 2. Verify the hash
-        require(userCommitment.commitHash == keccak256(abi.encodePacked(_secret, _salt)), "Invalid reveal");
-        userCommitment.revealed = true;
-        // 3. Process revealed value (e.g., store or use it)
-        secrets[msg.sender] = _secret;
-    }
 
 
-    // 11. merkleRoot: an advanced hash, now you can interact with it --------------------//
-    // - objective :
-    //     - verify membership of an element in a set
-    // - the problem : 
-    //      - you can't store big list of users onchain, thats expensive. Hashes are small bytes32 values, but you can not interact with them.
-    //      - if you store some small value like hash, how do you prove membership of an element that made up the hash. 
-    // - the solution : 
-    //      - you use merkle root that are small cuz its a hash at the end, but its special that you can interact with it.
-    // - implementation :
-    //      - 1. create a merkelRoot offchain (in ethers.js or Python) out of the set of elements and store it onchain
-    //      - 2. to verify membership, you will need the merkleProof and the leaf ready for that particular element. You need to generate 
-    //        the merkleProof offchain (in ethers.js or Python) before sending it to Solidity.
-    //      - 3. just call the verifyMember function with the leaf and merkleProof, it verifies the proof and tells if the element was included in
-    //        the calculation of the root hash.
-    // - properties : 
-    //      - small size of merkle root
-    //      - interactable: you can verify if an element was included in calculation of the root hash
-    //      - minimal computation: 
-    //          - building the merkleTree : O(N)
-    //          - everything else: O(logN)
-    // - use cases : 
-    //      - save gas on verifing a user's membership
-    //      - Prove a file’s integrity without storing it fully on-chain
-    // - trivia :
-    //      - merkleRoot: the final single hash at the top of the tree.
-    //          - Leaf nodes contain the hashes of individual data elements.
-    //          - Each parent node is the hash of its two child nodes.
-    //          - The merkle root is the final single hash at the top of the tree.
-    //      - merkleProof: all the brothers in the pairs upto root to prove the membership of an element
-    //          - A path of hashes in the tree needed to recompute the Merkle root.
-    //      - leaf: hash of an element in the set
-    // - scenario :
-    //      - verify if the caller is a member of allowlist
-    bytes32 public merkleRoot; 
-    function verifyMember(bytes32[] memory merkleProof) view public {
-        // prepare the leaf for the element
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
-        
-        // recreating merkleRoot using leaf and Proof, to match if its indeed the root. That tells if leaf was included in calculation of merkelRoot.
-        require(MerkleProof.verify(merkleProof, merkleRoot, leaf),"invalid proof");
-    }
-
-
-    // 12. Randomness generation : Chainlink VRF 
+    // Randomness onchain : Chainlink VRF 
     // - the problem : 
     //      - Computers are deterministic (outputs are generated via a fixed process). So there remains a chance of predicting outputs, if the 
     //        computation process is known. The issue is how do you get randomness in deterministic environments.
@@ -526,8 +653,6 @@ contract EssentialCryptography {
     // - use cases : 
     //      - fairness in distribution (lottery, in-game mechanisms)
 
-    
-    // 13. ERC 7683 : Cross Chain Intents
 }
 
 /// @dev 2/3 multisig account
